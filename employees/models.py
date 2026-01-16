@@ -7,6 +7,11 @@ class Employee(models.Model):
     role = models.CharField(max_length=50, blank=True, null=True)
     date_joined = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['id']  
+
 
     def __str__(self):
         return self.name
+    
+    
