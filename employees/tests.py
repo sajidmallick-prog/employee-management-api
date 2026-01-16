@@ -1,6 +1,7 @@
 from rest_framework.test import APITestCase
 from django.contrib.auth.models import User
 from rest_framework import status
+from django.urls import reverse
 from .models import Employee
 
 
@@ -13,103 +14,131 @@ class EmployeeAPITest(APITestCase):
             password="testpass123"
         )
 
-        # Get JWT token
-        response = self.client.post('/api/token/', {
-            'username': 'testuser',
-            'password': 'testpass123'
-        })
+        # Obtain JWT token
+        token_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {
+                'username': 'testuser',
+                'password': 'testpass123'
+            },
+            format='json'
+        )
 
-        self.access_token = response.data['access']
+        self.assertEqual(
+            token_response.status_code,
+            status.HTTP_200_OK
+        )
+
+        self.access_token = token_response.data['access']
 
         # Attach token to every request
         self.client.credentials(
-            HTTP_AUTHORIZATION='Bearer ' + self.access_token
+            HTTP_AUTHORIZATION=f'Bearer {self.access_token}'
         )
 
-
-class EmployeeCreateTest(APITestCase):
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="testuser",
-            password="test123"
-        )
-
-        token_response = self.client.post('/api/token/', {
-            'username': 'testuser',
-            'password': 'test123'
-        })
-
-        self.token = token_response.data['access']
-        self.client.credentials(
-            HTTP_AUTHORIZATION='Bearer ' + self.token
-        )
-
+    # ---------------- CREATE ----------------
     def test_create_employee(self):
-        response = self.client.post('/api/employees/', {
-            "name": "John",
-            "email": "john@test.com"
-        })
+        response = self.client.post(
+            reverse('employee-list'),
+            {
+                "name": "John",
+                "email": "john@test.com"
+            },
+            format='json'
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED
+        )
 
-
+    # ---------------- DUPLICATE EMAIL ----------------
     def test_duplicate_email(self):
         Employee.objects.create(
             name="John",
             email="john@test.com"
         )
 
-        response = self.client.post('/api/employees/', {
-            "name": "Jane",
-            "email": "john@test.com"
-        })
+        response = self.client.post(
+            reverse('employee-list'),
+            {
+                "name": "Jane",
+                "email": "john@test.com"
+            },
+            format='json'
+        )
 
         self.assertEqual(
             response.status_code,
             status.HTTP_400_BAD_REQUEST
         )
 
+    # ---------------- LIST ----------------
     def test_list_employees(self):
         Employee.objects.create(
-            name="A", email="a@test.com"
+            name="A",
+            email="a@test.com"
         )
 
-        response = self.client.get('/api/employees/')
+        response = self.client.get(
+            reverse('employee-list')
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
 
+    # ---------------- RETRIEVE ----------------
     def test_get_employee(self):
         emp = Employee.objects.create(
-            name="B", email="b@test.com"
+            name="B",
+            email="b@test.com"
         )
 
-        response = self.client.get(f'/api/employees/{emp.id}/')
+        response = self.client.get(
+            reverse('employee-detail', args=[emp.id])
+        )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK
+        )
 
+    # ---------------- INVALID ID ----------------
     def test_invalid_employee(self):
-        response = self.client.get('/api/employees/999/')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        response = self.client.get(
+            reverse('employee-detail', args=[999])
+        )
 
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND
+        )
 
+    # ---------------- DELETE ----------------
     def test_delete_employee(self):
         emp = Employee.objects.create(
-            name="C", email="c@test.com"
+            name="C",
+            email="c@test.com"
         )
 
-        response = self.client.delete(f'/api/employees/{emp.id}/')
+        response = self.client.delete(
+            reverse('employee-detail', args=[emp.id])
+        )
 
         self.assertEqual(
             response.status_code,
             status.HTTP_204_NO_CONTENT
         )
 
-
+    # ---------------- UNAUTHORIZED ----------------
     def test_unauthorized_access(self):
         self.client.credentials()  # remove token
 
-        response = self.client.get('/api/employees/')
+        response = self.client.get(
+            reverse('employee-list')
+        )
 
         self.assertEqual(
             response.status_code,
